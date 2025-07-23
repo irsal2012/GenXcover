@@ -134,6 +134,89 @@ export const songsAPI = {
   deleteSong: async (songId: number): Promise<void> => {
     await api.delete(`/songs/${songId}`);
   },
+
+  // Music generation endpoints
+  generateLyricsOnly: async (data: {
+    title: string;
+    genre: string;
+    theme?: string;
+    style?: string;
+    custom_prompt?: string;
+  }): Promise<{
+    lyrics: string;
+    structure: any;
+    metadata: any;
+  }> => {
+    const response = await api.post('/songs/generate-lyrics', data);
+    return response.data;
+  },
+
+  generateInstrumental: async (data: {
+    title: string;
+    genre: string;
+    key?: string;
+    tempo?: number;
+    duration?: number;
+    style?: string;
+    include_audio?: boolean;
+  }): Promise<{
+    title: string;
+    genre: string;
+    key: string;
+    tempo: number;
+    duration: number;
+    midi_file_path: string;
+    audio_file_path?: string;
+    chord_progression: any;
+  }> => {
+    const response = await api.post('/songs/generate-instrumental', data);
+    return response.data;
+  },
+
+  remixSong: async (songId: number, data: {
+    new_genre: string;
+    new_tempo?: number;
+    new_key?: string;
+  }): Promise<{
+    title: string;
+    original_genre: string;
+    new_genre: string;
+    midi_file_path: string;
+    audio_file_path: string;
+    remix_info: any;
+  }> => {
+    const response = await api.post(`/songs/${songId}/remix`, data);
+    return response.data;
+  },
+
+  getGenerationSuggestions: async (genre: string, theme?: string): Promise<{
+    genre: string;
+    recommended_tempos: number[];
+    recommended_keys: string[];
+    recommended_styles: string[];
+    recommended_voice_types: string[];
+    theme_suggestions: string[];
+  }> => {
+    const response = await api.get(`/songs/suggestions/${genre}`, {
+      params: theme ? { theme } : {}
+    });
+    return response.data;
+  },
+
+  getSupportedGenres: async (): Promise<{ genres: string[] }> => {
+    const response = await api.get('/songs/metadata/genres');
+    return response.data;
+  },
+
+  getSupportedVoiceTypes: async (): Promise<{ voice_types: string[] }> => {
+    const response = await api.get('/songs/metadata/voice-types');
+    return response.data;
+  },
+
+  getSupportedStyles: async (): Promise<{ styles: string[] }> => {
+    const response = await api.get('/songs/metadata/styles');
+    return response.data;
+  },
 };
 
 // File upload API
