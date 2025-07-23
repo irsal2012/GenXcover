@@ -566,33 +566,34 @@ const Home: React.FC = () => {
     );
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="home-container">
-        <div className="header-section">
-          <h1 className="page-title">Welcome to GenXcover</h1>
-          <p className="page-subtitle">
-            Create amazing music with AI-powered generation tools. Please log in to get started.
-          </p>
-          <div style={{ marginTop: '2rem' }}>
-            <button 
-              className="generate-btn primary" 
-              onClick={() => navigate('/login')}
-              style={{ marginRight: '1rem' }}
-            >
-              Login
-            </button>
-            <button 
-              className="generate-btn secondary" 
-              onClick={() => navigate('/register')}
-            >
-              Sign Up
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Temporarily disable authentication requirement
+  // if (!isAuthenticated) {
+  //   return (
+  //     <div className="home-container">
+  //       <div className="header-section">
+  //         <h1 className="page-title">Welcome to GenXcover</h1>
+  //         <p className="page-subtitle">
+  //           Create amazing music with AI-powered generation tools. Please log in to get started.
+  //         </p>
+  //         <div style={{ marginTop: '2rem' }}>
+  //           <button 
+  //             className="generate-btn primary" 
+  //             onClick={() => navigate('/login')}
+  //             style={{ marginRight: '1rem' }}
+  //           >
+  //             Login
+  //           </button>
+  //           <button 
+  //             className="generate-btn secondary" 
+  //             onClick={() => navigate('/register')}
+  //           >
+  //             Sign Up
+  //           </button>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="home-container">
