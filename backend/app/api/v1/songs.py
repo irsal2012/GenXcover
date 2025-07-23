@@ -37,8 +37,9 @@ async def generate_song(
     current_user: UserModel = Depends(get_current_active_user)
 ):
     """Generate a complete song with AI"""
+    db_song = None
     try:
-        # Create initial song record
+        # Create initial song record with pending status
         db_song = SongModel(
             title=song_request.title,
             genre=song_request.genre,
@@ -46,14 +47,35 @@ async def generate_song(
             theme=song_request.theme,
             voice_type=getattr(song_request, 'voice_type', 'Male'),
             creator_id=current_user.id,
-            generation_params=song_request.dict()
+            generation_params={
+                **song_request.dict(),
+                "generation_status": "pending",
+                "generation_step": "initializing"
+            }
         )
         db.add(db_song)
         db.commit()
         db.refresh(db_song)
         
-        # Generate complete song using MusicGenerator
+        # Update status to lyrics generation
+        db_song.generation_params["generation_step"] = "generating_lyrics"
+        db.commit()
+        
+        # Initialize MusicGenerator and check availability
         music_generator = MusicGenerator()
+        
+        # Check if MusicGen is available and update status
+        if hasattr(music_generator, 'using_musicgen') and music_generator.using_musicgen:
+            db_song.generation_params["audio_engine"] = "musicgen"
+            db_song.generation_params["audio_quality"] = "high"
+        else:
+            db_song.generation_params["audio_engine"] = "basic_synthesizer"
+            db_song.generation_params["audio_quality"] = "basic"
+            logger.warning("MusicGen not available, using basic synthesizer")
+        
+        db.commit()
+        
+        # Generate complete song using MusicGenerator
         generation_result = await music_generator.generate_complete_song(
             title=song_request.title,
             genre=song_request.genre,
@@ -64,6 +86,10 @@ async def generate_song(
             include_midi=getattr(song_request, 'include_midi', True),
             custom_prompt=getattr(song_request, 'custom_prompt', None)
         )
+        
+        # Update status to finalizing
+        db_song.generation_params["generation_step"] = "finalizing"
+        db.commit()
         
         # Update song with generated content
         db_song.lyrics = generation_result.get("lyrics", "")
@@ -91,9 +117,11 @@ async def generate_song(
         if generation_result.get("analysis"):
             db_song.audio_features = generation_result["analysis"]
         
-        # Update generation parameters with results
+        # Update generation parameters with success status
         db_song.generation_params = {
             **db_song.generation_params,
+            "generation_status": "completed",
+            "generation_step": "completed",
             "generation_successful": True,
             "generation_timestamp": generation_result.get("generation_timestamp"),
             "files_generated": {
@@ -107,19 +135,111 @@ async def generate_song(
         return db_song
         
     except Exception as e:
-        logger.error(f"Error generating song: {str(e)}")
+        error_message = str(e)
+        logger.error(f"Error generating song: {error_message}")
+        
+        # Determine user-friendly error message
+        user_friendly_error = _get_user_friendly_error(error_message)
+        
         # Update song with error status
-        if 'db_song' in locals():
+        if db_song:
             db_song.generation_params = {
                 **db_song.generation_params,
+                "generation_status": "failed",
+                "generation_step": "error",
                 "generation_successful": False,
-                "error": str(e)
+                "error": error_message,
+                "user_friendly_error": user_friendly_error
             }
             db.commit()
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate song: {str(e)}"
+            detail={
+                "message": user_friendly_error,
+                "technical_error": error_message,
+                "error_type": _classify_error(error_message),
+                "suggestions": _get_error_suggestions(error_message)
+            }
         )
+
+
+def _get_user_friendly_error(error_message: str) -> str:
+    """Convert technical error to user-friendly message"""
+    error_lower = error_message.lower()
+    
+    if "musicgen" in error_lower and "not available" in error_lower:
+        return "High-quality audio generation is currently unavailable. Using basic audio synthesis instead."
+    elif "cuda" in error_lower or "gpu" in error_lower or "memory" in error_lower:
+        return "Audio generation failed due to insufficient system resources. Please try again with shorter duration or contact support."
+    elif "timeout" in error_lower:
+        return "Audio generation is taking longer than expected. Please try again or reduce the song duration."
+    elif "azure" in error_lower or "openai" in error_lower:
+        return "Lyrics generation service is temporarily unavailable. Please try again later."
+    elif "connection" in error_lower or "network" in error_lower:
+        return "Network connection issue. Please check your internet connection and try again."
+    elif "permission" in error_lower or "access" in error_lower:
+        return "Access denied. Please check your account permissions."
+    else:
+        return "An unexpected error occurred during song generation. Please try again or contact support if the problem persists."
+
+
+def _classify_error(error_message: str) -> str:
+    """Classify error type for better handling"""
+    error_lower = error_message.lower()
+    
+    if "musicgen" in error_lower or "audiocraft" in error_lower:
+        return "audio_generation_error"
+    elif "cuda" in error_lower or "gpu" in error_lower:
+        return "resource_error"
+    elif "azure" in error_lower or "openai" in error_lower:
+        return "ai_service_error"
+    elif "connection" in error_lower or "network" in error_lower:
+        return "network_error"
+    elif "timeout" in error_lower:
+        return "timeout_error"
+    else:
+        return "unknown_error"
+
+
+def _get_error_suggestions(error_message: str) -> list:
+    """Get suggestions based on error type"""
+    error_type = _classify_error(error_message)
+    
+    suggestions = {
+        "audio_generation_error": [
+            "Try using basic audio synthesis instead",
+            "Check if MusicGen dependencies are installed",
+            "Reduce song duration to under 30 seconds"
+        ],
+        "resource_error": [
+            "Try generating shorter songs (under 15 seconds)",
+            "Close other applications to free up memory",
+            "Contact support for system requirements"
+        ],
+        "ai_service_error": [
+            "Check your internet connection",
+            "Verify API credentials are configured",
+            "Try again in a few minutes"
+        ],
+        "network_error": [
+            "Check your internet connection",
+            "Try again in a few moments",
+            "Contact support if problem persists"
+        ],
+        "timeout_error": [
+            "Try generating shorter songs",
+            "Reduce complexity by using simpler genres",
+            "Try again during off-peak hours"
+        ],
+        "unknown_error": [
+            "Try again in a few minutes",
+            "Check your input parameters",
+            "Contact support with error details"
+        ]
+    }
+    
+    return suggestions.get(error_type, ["Try again later", "Contact support if problem persists"])
 
 
 @router.post("/generate-lyrics")
@@ -484,3 +604,155 @@ async def get_supported_styles():
     return {
         "styles": ["Upbeat", "Melancholic", "Energetic", "Calm", "Dramatic", "Romantic", "Aggressive", "Dreamy", "Nostalgic", "Futuristic"]
     }
+
+
+@router.get("/{song_id}/status")
+def get_generation_status(
+    song_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_active_user)
+):
+    """Get generation status for a song"""
+    song = db.query(SongModel).filter(SongModel.id == song_id).first()
+    if not song:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Song not found"
+        )
+    
+    # Check if user owns the song
+    if song.creator_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+    
+    generation_params = song.generation_params or {}
+    
+    return {
+        "song_id": song_id,
+        "status": generation_params.get("generation_status", "unknown"),
+        "step": generation_params.get("generation_step", "unknown"),
+        "progress": _get_progress_percentage(generation_params.get("generation_step", "unknown")),
+        "audio_engine": generation_params.get("audio_engine", "unknown"),
+        "audio_quality": generation_params.get("audio_quality", "unknown"),
+        "error": generation_params.get("user_friendly_error"),
+        "suggestions": generation_params.get("suggestions", []),
+        "files_generated": generation_params.get("files_generated", {}),
+        "is_completed": generation_params.get("generation_status") == "completed",
+        "has_error": generation_params.get("generation_status") == "failed"
+    }
+
+
+def _get_progress_percentage(step: str) -> int:
+    """Get progress percentage based on generation step"""
+    step_progress = {
+        "initializing": 10,
+        "generating_lyrics": 30,
+        "generating_midi": 50,
+        "generating_audio": 80,
+        "finalizing": 95,
+        "completed": 100,
+        "error": 0
+    }
+    return step_progress.get(step, 0)
+
+
+@router.post("/check-system-status")
+async def check_system_status():
+    """Check system status and capabilities"""
+    try:
+        # Initialize MusicGenerator to check capabilities
+        music_generator = MusicGenerator()
+        
+        # Check MusicGen availability
+        musicgen_available = False
+        musicgen_info = {}
+        
+        if hasattr(music_generator, 'musicgen_synthesizer'):
+            musicgen_synthesizer = music_generator.musicgen_synthesizer
+            if musicgen_synthesizer and musicgen_synthesizer.is_available():
+                musicgen_available = True
+                musicgen_info = musicgen_synthesizer.get_model_info()
+        
+        # Check Azure OpenAI availability
+        azure_openai_available = False
+        try:
+            from ...services.azure_openai_client import azure_openai_client
+            azure_openai_available = azure_openai_client.is_available()
+        except Exception:
+            pass
+        
+        return {
+            "system_status": "operational",
+            "audio_generation": {
+                "musicgen_available": musicgen_available,
+                "musicgen_info": musicgen_info,
+                "fallback_synthesizer": True,
+                "recommended_engine": "musicgen" if musicgen_available else "basic_synthesizer"
+            },
+            "lyrics_generation": {
+                "azure_openai_available": azure_openai_available,
+                "fallback_templates": True
+            },
+            "capabilities": {
+                "high_quality_audio": musicgen_available,
+                "ai_lyrics": azure_openai_available,
+                "midi_generation": True,
+                "multiple_genres": True
+            },
+            "recommendations": _get_system_recommendations(musicgen_available, azure_openai_available)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking system status: {str(e)}")
+        return {
+            "system_status": "degraded",
+            "error": str(e),
+            "audio_generation": {
+                "musicgen_available": False,
+                "fallback_synthesizer": True,
+                "recommended_engine": "basic_synthesizer"
+            },
+            "lyrics_generation": {
+                "azure_openai_available": False,
+                "fallback_templates": True
+            },
+            "capabilities": {
+                "high_quality_audio": False,
+                "ai_lyrics": False,
+                "midi_generation": True,
+                "multiple_genres": True
+            }
+        }
+
+
+def _get_system_recommendations(musicgen_available: bool, azure_openai_available: bool) -> list:
+    """Get system recommendations based on availability"""
+    recommendations = []
+    
+    if not musicgen_available:
+        recommendations.append({
+            "type": "warning",
+            "message": "High-quality audio generation (MusicGen) is not available",
+            "action": "Install MusicGen dependencies for better audio quality",
+            "priority": "medium"
+        })
+    
+    if not azure_openai_available:
+        recommendations.append({
+            "type": "info",
+            "message": "AI lyrics generation is not configured",
+            "action": "Configure Azure OpenAI credentials for AI-powered lyrics",
+            "priority": "low"
+        })
+    
+    if musicgen_available and azure_openai_available:
+        recommendations.append({
+            "type": "success",
+            "message": "All AI features are available",
+            "action": "You can generate high-quality songs with AI lyrics and audio",
+            "priority": "info"
+        })
+    
+    return recommendations

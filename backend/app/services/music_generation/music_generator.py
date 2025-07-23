@@ -3,15 +3,29 @@ from typing import Dict, Any, Optional
 from .lyrics_generator import LyricsGenerator
 from .midi_generator import MIDIGenerator
 from .audio_synthesizer import AudioSynthesizer
+from .musicgen_synthesizer import MusicGenSynthesizer
 
 
 class MusicGenerator:
     """Comprehensive music generation service that orchestrates all components"""
     
-    def __init__(self):
+    def __init__(self, use_musicgen: bool = True):
         self.lyrics_generator = LyricsGenerator()
         self.midi_generator = MIDIGenerator()
-        self.audio_synthesizer = AudioSynthesizer()
+        
+        # Choose synthesizer based on availability and preference
+        if use_musicgen:
+            self.musicgen_synthesizer = MusicGenSynthesizer()
+            if self.musicgen_synthesizer.is_available():
+                self.audio_synthesizer = self.musicgen_synthesizer
+                self.using_musicgen = True
+            else:
+                print("⚠️  MusicGen not available, falling back to basic synthesizer")
+                self.audio_synthesizer = AudioSynthesizer()
+                self.using_musicgen = False
+        else:
+            self.audio_synthesizer = AudioSynthesizer()
+            self.using_musicgen = False
     
     async def generate_complete_song(
         self,
