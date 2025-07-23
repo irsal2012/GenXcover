@@ -1,0 +1,8 @@
+{
+  "title": "Test Audio",
+  "duration": 30.0,
+  "sample_rate": 44100,
+  "channels": 2,
+  "format": "wav",
+  "samples": 1323000
+}

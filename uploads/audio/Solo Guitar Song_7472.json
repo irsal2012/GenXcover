@@ -1,0 +1,8 @@
+{
+  "title": "Solo Guitar Song",
+  "duration": 120.0,
+  "sample_rate": 44100,
+  "channels": 2,
+  "format": "wav",
+  "samples": 5292000
+}
