@@ -26,7 +26,7 @@ app.add_middleware(
 )
 
 # Create uploads directory if it doesn't exist
-uploads_dir = "backend/uploads"
+uploads_dir = "uploads"
 os.makedirs(uploads_dir, exist_ok=True)
 os.makedirs(f"{uploads_dir}/audio", exist_ok=True)
 os.makedirs(f"{uploads_dir}/midi", exist_ok=True)

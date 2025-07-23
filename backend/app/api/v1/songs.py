@@ -69,11 +69,15 @@ async def generate_song(
         db_song.lyrics = generation_result.get("lyrics", "")
         db_song.is_generated = True
         
-        # Store file paths
+        # Store file paths and convert to URLs
         if generation_result.get("audio_file_path"):
-            db_song.audio_file_path = generation_result["audio_file_path"]
+            # Convert local path to URL
+            audio_path = generation_result["audio_file_path"]
+            db_song.audio_file_path = f"http://localhost:8005/{audio_path}"
         if generation_result.get("midi_file_path"):
-            db_song.midi_file_path = generation_result["midi_file_path"]
+            # Convert local path to URL
+            midi_path = generation_result["midi_file_path"]
+            db_song.midi_file_path = f"http://localhost:8005/{midi_path}"
         
         # Store metadata
         if generation_result.get("duration"):

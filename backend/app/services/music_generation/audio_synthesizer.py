@@ -2,6 +2,8 @@ import asyncio
 import numpy as np
 import random
 import os
+import wave
+import struct
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 import json
@@ -514,19 +516,37 @@ class AudioSynthesizer:
         
         # Generate filename
         safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).rstrip()
-        filename = f"{safe_title}_{random.randint(1000, 9999)}.npy"  # Save as numpy array for now
+        filename = f"{safe_title}_{random.randint(1000, 9999)}.wav"
         file_path = uploads_dir / filename
         
-        # Save audio data (in real implementation, would save as WAV/MP3)
-        np.save(file_path, audio_data)
+        # Convert audio data to 16-bit integers
+        # Ensure audio is in range [-1, 1]
+        audio_normalized = np.clip(audio_data, -1.0, 1.0)
+        
+        # Convert to 16-bit PCM
+        audio_int16 = (audio_normalized * 32767).astype(np.int16)
+        
+        # Create stereo audio by duplicating mono channel
+        if len(audio_int16.shape) == 1:
+            # Mono to stereo
+            stereo_audio = np.column_stack((audio_int16, audio_int16))
+        else:
+            stereo_audio = audio_int16
+        
+        # Save as WAV file
+        with wave.open(str(file_path), 'wb') as wav_file:
+            wav_file.setnchannels(2)  # Stereo
+            wav_file.setsampwidth(2)  # 16-bit
+            wav_file.setframerate(self.sample_rate)
+            wav_file.writeframes(stereo_audio.tobytes())
         
         # Also save metadata
         metadata = {
             'title': title,
             'duration': len(audio_data) / self.sample_rate,
             'sample_rate': self.sample_rate,
-            'channels': self.channels,
-            'format': format,
+            'channels': 2,  # Stereo
+            'format': 'wav',
             'samples': len(audio_data)
         }
         
