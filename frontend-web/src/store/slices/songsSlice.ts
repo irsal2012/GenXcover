@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Song, SongGenerate, SongList } from '../../types';
+import { Song, SongGenerate } from '../../types';
 import { songsAPI } from '../../services/api';
 
 interface SongsState {
@@ -33,12 +33,12 @@ const initialState: SongsState = {
 // Async thunks
 export const fetchSongs = createAsyncThunk(
   'songs/fetchSongs',
-  async (params?: {
+  async (params: {
     skip?: number;
     limit?: number;
     genre?: string;
     creator_id?: number;
-  }, { rejectWithValue }) => {
+  } | undefined, { rejectWithValue }) => {
     try {
       const response = await songsAPI.getSongs(params);
       return response;
@@ -50,7 +50,7 @@ export const fetchSongs = createAsyncThunk(
 
 export const fetchMySongs = createAsyncThunk(
   'songs/fetchMySongs',
-  async (params?: { skip?: number; limit?: number }, { rejectWithValue }) => {
+  async (params: { skip?: number; limit?: number } | undefined, { rejectWithValue }) => {
     try {
       const songs = await songsAPI.getMySongs(params?.skip, params?.limit);
       return songs;
