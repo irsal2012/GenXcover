@@ -13,10 +13,11 @@ const App: React.FC = () => {
     <Provider store={store}>
       <Router>
         <div className="App">
+          {/* Authentication temporarily disabled - routing directly to main functionality */}
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Home />} />
+            <Route path="/register" element={<Home />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/generate-music" element={<Home />} />
           </Routes>

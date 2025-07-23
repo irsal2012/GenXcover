@@ -126,6 +126,91 @@ class MusicGenerator:
             custom_prompt=custom_prompt
         )
     
+    async def generate_song_from_lyrics(
+        self,
+        lyrics: str,
+        title: str,
+        genre: str,
+        voice_type: str = 'Male',
+        key: str = 'C',
+        tempo: int = 120,
+        duration: Optional[int] = None,
+        include_audio: bool = True,
+        include_midi: bool = True,
+        style: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generate a complete song from existing lyrics"""
+        
+        try:
+            generation_results = {
+                'title': title,
+                'genre': genre,
+                'style': style,
+                'voice_type': voice_type,
+                'key': key,
+                'tempo': tempo,
+                'generation_timestamp': asyncio.get_event_loop().time(),
+                'lyrics': lyrics
+            }
+            
+            # Estimate duration from lyrics if not provided
+            if not duration:
+                word_count = len(lyrics.split())
+                duration = max(120, int(word_count / 2.5))  # Rough estimate: 2.5 words per second
+            
+            generation_results['duration'] = duration
+            
+            # Parse lyrics structure for better music generation
+            lyrics_structure = self.lyrics_generator._parse_lyrics_structure(lyrics)
+            generation_results['lyrics_structure'] = lyrics_structure
+            
+            # Step 1: Generate MIDI if requested
+            midi_result = None
+            if include_midi:
+                print(f"🎹 Generating MIDI arrangement for existing lyrics...")
+                midi_result = await self.midi_generator.generate_midi(
+                    title=title,
+                    genre=genre,
+                    key=key,
+                    tempo=tempo,
+                    duration=duration,
+                    style=style
+                )
+                
+                generation_results['midi_file_path'] = midi_result['midi_file_path']
+                generation_results['midi_data'] = midi_result['midi_data']
+                generation_results['chord_progression'] = midi_result['generation_info']['chord_progression']
+            
+            # Step 2: Generate audio if requested
+            audio_result = None
+            if include_audio and midi_result:
+                print(f"🔊 Synthesizing audio with vocals...")
+                audio_result = await self.audio_synthesizer.synthesize_audio(
+                    midi_data=midi_result['midi_data'],
+                    lyrics=lyrics,
+                    voice_type=voice_type,
+                    output_format='wav'
+                )
+                
+                generation_results['audio_file_path'] = audio_result['audio_file_path']
+                generation_results['audio_metadata'] = {
+                    'duration': audio_result['duration'],
+                    'sample_rate': audio_result['sample_rate'],
+                    'channels': audio_result['channels'],
+                    'format': audio_result['format']
+                }
+                generation_results['synthesis_info'] = audio_result['synthesis_info']
+            
+            # Step 3: Analyze generated content
+            analysis = await self._analyze_generated_song(generation_results)
+            generation_results['analysis'] = analysis
+            
+            print(f"✅ Song generation from lyrics complete!")
+            return generation_results
+            
+        except Exception as e:
+            raise Exception(f"Failed to generate song from lyrics: {str(e)}")
+    
     async def generate_instrumental(
         self,
         title: str,

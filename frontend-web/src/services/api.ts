@@ -21,13 +21,14 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token - TEMPORARILY DISABLED
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    // Authentication temporarily disabled
+    // const token = localStorage.getItem('access_token');
+    // if (token) {
+    //   config.headers.Authorization = `Bearer ${token}`;
+    // }
     return config;
   },
   (error) => {
@@ -35,16 +36,17 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Response interceptor to handle errors - TEMPORARILY DISABLED
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
+    // Authentication temporarily disabled
+    // if (error.response?.status === 401) {
+    //   // Token expired or invalid
+    //   localStorage.removeItem('access_token');
+    //   localStorage.removeItem('user');
+    //   window.location.href = '/login';
+    // }
     return Promise.reject(error);
   }
 );
@@ -148,6 +150,22 @@ export const songsAPI = {
     metadata: any;
   }> => {
     const response = await api.post('/songs/generate-lyrics', data);
+    return response.data;
+  },
+
+  generateSongFromLyrics: async (data: {
+    lyrics: string;
+    title: string;
+    genre: string;
+    voice_type?: string;
+    key?: string;
+    tempo?: number;
+    duration?: number;
+    include_audio?: boolean;
+    include_midi?: boolean;
+    style?: string;
+  }): Promise<Song> => {
+    const response: AxiosResponse<Song> = await api.post('/songs/generate-from-lyrics', data);
     return response.data;
   },
 

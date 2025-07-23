@@ -441,3 +441,144 @@
 .lyrics-content::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.5);
 }
+
+/* New styles for the "Generate Full Song" feature */
+.result-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.lyrics-editor {
+  min-height: 200px;
+  font-family: 'Georgia', serif;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.form-description {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.midi-info {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-top: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.midi-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: white;
+  font-size: 1.1rem;
+}
+
+.midi-info p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+}
+
+.audio-player h4,
+.lyrics-content h4 {
+  margin: 0 0 1rem 0;
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* Enhanced result section styling */
+.result-section p {
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0.5rem 0;
+  font-size: 1rem;
+}
+
+/* Responsive adjustments for new elements */
+@media (max-width: 768px) {
+  .button-group {
+    justify-content: center;
+    flex-direction: column;
+  }
+  
+  .result-actions {
+    flex-direction: column;
+  }
+  
+  .lyrics-editor {
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .button-group {
+    gap: 0.5rem;
+  }
+  
+  .generate-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Animation for smooth transitions */
+.form-container,
+.results-container {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Enhanced focus states */
+.lyrics-editor:focus {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Loading state improvements */
+.generate-btn:disabled {
+  position: relative;
+  overflow: hidden;
+}
+
+.generate-btn:disabled::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}

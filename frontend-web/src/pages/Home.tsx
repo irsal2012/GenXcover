@@ -19,6 +19,8 @@ const Home: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GenerationResult | null>(null);
+  const [showMusicForm, setShowMusicForm] = useState(false);
+  const [editableLyrics, setEditableLyrics] = useState('');
 
   // Full song generation form state
   const [fullSongForm, setFullSongForm] = useState<SongGenerate>({
@@ -58,6 +60,16 @@ const Home: React.FC = () => {
     new_genre: 'Pop',
     new_tempo: 120,
     new_key: 'C',
+  });
+
+  // Music generation from lyrics form state
+  const [musicForm, setMusicForm] = useState({
+    voice_type: 'Male',
+    key: 'C',
+    tempo: 120,
+    duration: 180,
+    include_audio: true,
+    include_midi: true,
   });
 
   const [userSongs, setUserSongs] = useState<any[]>([]);
@@ -155,6 +167,56 @@ const Home: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGenerateFullSong = () => {
+    if (result && result.type === 'lyrics') {
+      setEditableLyrics(result.data.lyrics);
+      setShowMusicForm(true);
+    }
+  };
+
+  const handleSongFromLyricsGeneration = async () => {
+    if (!editableLyrics.trim()) {
+      setError('Please provide lyrics');
+      return;
+    }
+
+    if (!lyricsForm.title.trim()) {
+      setError('Please provide a song title');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const songData = {
+        lyrics: editableLyrics,
+        title: lyricsForm.title,
+        genre: lyricsForm.genre,
+        voice_type: musicForm.voice_type,
+        key: musicForm.key,
+        tempo: musicForm.tempo,
+        duration: musicForm.duration,
+        include_audio: musicForm.include_audio,
+        include_midi: musicForm.include_midi,
+        style: lyricsForm.style,
+      };
+
+      const result = await songsAPI.generateSongFromLyrics(songData);
+      setResult({ type: 'full', data: result });
+      setShowMusicForm(false);
+    } catch (error: any) {
+      setError(error.response?.data?.detail || 'Failed to generate song from lyrics');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelMusicGeneration = () => {
+    setShowMusicForm(false);
+    setEditableLyrics('');
   };
 
   const renderFullSongForm = () => (
@@ -496,19 +558,141 @@ const Home: React.FC = () => {
     </div>
   );
 
+  const renderMusicGenerationForm = () => (
+    <div className="form-container">
+      <div className="form-section">
+        <h3>🎵 Generate Full Song from Lyrics</h3>
+        <p className="form-description">
+          Configure the musical parameters to generate a complete song with your lyrics.
+        </p>
+        
+        <div className="form-group">
+          <label>Edit Lyrics (Optional)</label>
+          <textarea
+            value={editableLyrics}
+            onChange={(e) => setEditableLyrics(e.target.value)}
+            placeholder="Edit your lyrics here..."
+            rows={8}
+            className="lyrics-editor"
+          />
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Voice Type</label>
+            <select
+              value={musicForm.voice_type}
+              onChange={(e) => setMusicForm({ ...musicForm, voice_type: e.target.value })}
+            >
+              {VOICE_TYPES.map(voice => (
+                <option key={voice} value={voice}>{voice}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Key</label>
+            <select
+              value={musicForm.key}
+              onChange={(e) => setMusicForm({ ...musicForm, key: e.target.value })}
+            >
+              {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map(key => (
+                <option key={key} value={key}>{key}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Tempo (BPM)</label>
+            <input
+              type="number"
+              value={musicForm.tempo}
+              onChange={(e) => setMusicForm({ ...musicForm, tempo: parseInt(e.target.value) })}
+              min="60"
+              max="200"
+            />
+          </div>
+          <div className="form-group">
+            <label>Duration (seconds)</label>
+            <input
+              type="number"
+              value={musicForm.duration}
+              onChange={(e) => setMusicForm({ ...musicForm, duration: parseInt(e.target.value) })}
+              min="30"
+              max="600"
+            />
+          </div>
+        </div>
+
+        <div className="form-section">
+          <h4>🎼 Output Options</h4>
+          <div className="checkbox-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={musicForm.include_audio}
+                onChange={(e) => setMusicForm({ ...musicForm, include_audio: e.target.checked })}
+              />
+              <span>Generate Audio File</span>
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={musicForm.include_midi}
+                onChange={(e) => setMusicForm({ ...musicForm, include_midi: e.target.checked })}
+              />
+              <span>Generate MIDI File</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="button-group">
+          <button
+            type="button"
+            className="generate-btn secondary"
+            onClick={handleCancelMusicGeneration}
+            disabled={isLoading}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="generate-btn primary"
+            onClick={handleSongFromLyricsGeneration}
+            disabled={isLoading}
+          >
+            {isLoading ? '🎵 Generating Song...' : '🎵 Generate Full Song'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderResults = () => {
     if (!result) return null;
 
     return (
       <div className="results-container">
-        {result.type === 'lyrics' && (
+        {result.type === 'lyrics' && !showMusicForm && (
           <div className="result-section">
             <h2 className="result-title">📝 Generated Lyrics</h2>
             <div className="lyrics-content">
               <pre>{result.data.lyrics}</pre>
             </div>
+            <div className="result-actions">
+              <button
+                className="generate-btn primary"
+                onClick={handleGenerateFullSong}
+                disabled={isLoading}
+              >
+                🎵 Generate Full Song from These Lyrics
+              </button>
+            </div>
           </div>
         )}
+
+        {result.type === 'lyrics' && showMusicForm && renderMusicGenerationForm()}
 
         {result.type === 'instrumental' && (
           <div className="result-section">
@@ -533,15 +717,23 @@ const Home: React.FC = () => {
             <p>Genre: {result.data.genre} | Style: {result.data.style}</p>
             {result.data.lyrics && (
               <div className="lyrics-content">
+                <h4>Lyrics:</h4>
                 <pre>{result.data.lyrics}</pre>
               </div>
             )}
             {result.data.audio_file_path && (
               <div className="audio-player">
+                <h4>Audio:</h4>
                 <audio controls>
                   <source src={result.data.audio_file_path} type="audio/mpeg" />
                   Your browser does not support the audio element.
                 </audio>
+              </div>
+            )}
+            {result.data.midi_file_path && (
+              <div className="midi-info">
+                <h4>MIDI:</h4>
+                <p>MIDI file generated: {result.data.midi_file_path}</p>
               </div>
             )}
           </div>

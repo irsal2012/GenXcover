@@ -11,47 +11,41 @@ security = HTTPBearer()
 
 
 def get_current_user(
-    db: Session = Depends(get_db),
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    db: Session = Depends(get_db)
 ) -> User:
-    """Get current authenticated user"""
-    token = credentials.credentials
-    payload = verify_token(token)
-    email: str = payload.get("sub")
-    
-    if email is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    user = AuthService.get_user_by_email(db, email=email)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    return user
+    """Get current authenticated user - TEMPORARILY DISABLED"""
+    # Create a dummy user for testing without authentication
+    dummy_user = User(
+        id=1,
+        email="test@example.com",
+        full_name="Test User",
+        is_active=True,
+        is_superuser=False
+    )
+    return dummy_user
 
 
-def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
-    """Get current active user"""
-    if not current_user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
-    return current_user
+def get_current_active_user(db: Session = Depends(get_db)) -> User:
+    """Get current active user - TEMPORARILY DISABLED"""
+    # Create a dummy user for testing without authentication
+    dummy_user = User(
+        id=1,
+        email="test@example.com",
+        full_name="Test User",
+        is_active=True,
+        is_superuser=False
+    )
+    return dummy_user
 
 
-def get_current_superuser(current_user: User = Depends(get_current_user)) -> User:
-    """Get current superuser"""
-    if not current_user.is_superuser:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
-        )
-    return current_user
+def get_current_superuser(db: Session = Depends(get_db)) -> User:
+    """Get current superuser - TEMPORARILY DISABLED"""
+    # Create a dummy superuser for testing without authentication
+    dummy_user = User(
+        id=1,
+        email="admin@example.com",
+        full_name="Admin User",
+        is_active=True,
+        is_superuser=True
+    )
+    return dummy_user

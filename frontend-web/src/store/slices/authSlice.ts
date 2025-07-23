@@ -11,9 +11,17 @@ interface AuthState {
 }
 
 const initialState: AuthState = {
-  user: null,
-  token: localStorage.getItem('access_token'),
-  isAuthenticated: !!localStorage.getItem('access_token'),
+  // Temporarily bypass authentication - set dummy user
+  user: {
+    id: 1,
+    email: 'test@example.com',
+    username: 'testuser',
+    full_name: 'Test User',
+    is_active: true,
+    created_at: new Date().toISOString(),
+  },
+  token: 'dummy_token',
+  isAuthenticated: true, // Temporarily set to true
   isLoading: false,
   error: null,
 };
