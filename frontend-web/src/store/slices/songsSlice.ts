@@ -84,6 +84,24 @@ export const generateSong = createAsyncThunk(
   }
 );
 
+export const generateLyrics = createAsyncThunk(
+  'songs/generateLyrics',
+  async (lyricsData: {
+    title: string;
+    genre: string;
+    style?: string;
+    theme?: string;
+    custom_prompt?: string;
+  }, { rejectWithValue }) => {
+    try {
+      const result = await songsAPI.generateLyricsOnly(lyricsData);
+      return result;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.detail || 'Failed to generate lyrics');
+    }
+  }
+);
+
 export const deleteSong = createAsyncThunk(
   'songs/deleteSong',
   async (songId: number, { rejectWithValue }) => {
@@ -190,6 +208,21 @@ const songsSlice = createSlice({
         state.currentSong = action.payload;
       })
       .addCase(generateSong.rejected, (state, action) => {
+        state.isGenerating = false;
+        state.error = action.payload as string;
+      });
+
+    // Generate lyrics
+    builder
+      .addCase(generateLyrics.pending, (state) => {
+        state.isGenerating = true;
+        state.error = null;
+      })
+      .addCase(generateLyrics.fulfilled, (state, action) => {
+        state.isGenerating = false;
+        // Lyrics generation doesn't create a song, just returns lyrics
+      })
+      .addCase(generateLyrics.rejected, (state, action) => {
         state.isGenerating = false;
         state.error = action.payload as string;
       });

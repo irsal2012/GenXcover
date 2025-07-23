@@ -1,48 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { RootState } from '../store';
 import { songsAPI } from '../services/api';
-import { Song, Genre, VoiceType, Style, GENRES, VOICE_TYPES, STYLES } from '../types';
+import { GENRES, VOICE_TYPES, STYLES, SongGenerate } from '../types';
 import './Home.css';
 
-interface GenerationForm {
-  title: string;
-  genre: Genre;
-  style: Style;
-  theme: string;
-  voice_type: VoiceType;
-  custom_prompt: string;
-  include_audio: boolean;
-  include_midi: boolean;
-  key: string;
-  tempo: number;
-  duration: number;
-}
-
-interface GenerationSuggestions {
-  genre: string;
-  recommended_tempos: number[];
-  recommended_keys: string[];
-  recommended_styles: string[];
-  recommended_voice_types: string[];
-  theme_suggestions: string[];
+interface GenerationResult {
+  type: 'full' | 'lyrics' | 'instrumental' | 'remix';
+  data: any;
 }
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const { user } = useSelector((state: RootState) => state.auth);
-  const { songs, isLoading } = useSelector((state: RootState) => state.songs);
+  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  
+  const [activeTab, setActiveTab] = useState<'full' | 'lyrics' | 'instrumental' | 'remix'>('full');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<GenerationResult | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'generate' | 'lyrics' | 'instrumental'>('generate');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationProgress, setGenerationProgress] = useState('');
-  const [generatedSong, setGeneratedSong] = useState<Song | null>(null);
-  const [suggestions, setSuggestions] = useState<GenerationSuggestions | null>(null);
-  const [recentSongs, setRecentSongs] = useState<Song[]>([]);
-
-  const [form, setForm] = useState<GenerationForm>({
+  // Full song generation form state
+  const [fullSongForm, setFullSongForm] = useState<SongGenerate>({
     title: '',
     genre: 'Pop',
     style: 'Upbeat',
@@ -51,765 +30,623 @@ const Home: React.FC = () => {
     custom_prompt: '',
     include_audio: true,
     include_midi: true,
-    key: 'C',
-    tempo: 120,
-    duration: 180
   });
 
+  // Lyrics only form state
   const [lyricsForm, setLyricsForm] = useState({
     title: '',
-    genre: 'Pop' as Genre,
+    genre: 'Pop',
     theme: '',
-    style: 'Upbeat' as Style,
-    custom_prompt: ''
+    style: 'Upbeat',
+    custom_prompt: '',
   });
 
+  // Instrumental form state
   const [instrumentalForm, setInstrumentalForm] = useState({
     title: '',
-    genre: 'Pop' as Genre,
+    genre: 'Pop',
     key: 'C',
     tempo: 120,
     duration: 180,
-    style: 'Upbeat' as Style,
-    include_audio: true
+    style: 'Upbeat',
+    include_audio: true,
   });
 
-  const [generatedLyrics, setGeneratedLyrics] = useState<any>(null);
-  const [generatedInstrumental, setGeneratedInstrumental] = useState<any>(null);
+  // Remix form state
+  const [remixForm, setRemixForm] = useState({
+    song_id: '',
+    new_genre: 'Pop',
+    new_tempo: 120,
+    new_key: 'C',
+  });
 
-  const keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const [userSongs, setUserSongs] = useState<any[]>([]);
 
   useEffect(() => {
-    loadRecentSongs();
-  }, []);
-
-  useEffect(() => {
-    if (form.genre) {
-      loadSuggestions(form.genre, form.theme);
+    if (isAuthenticated) {
+      loadUserSongs();
     }
-  }, [form.genre, form.theme]);
+  }, [isAuthenticated]);
 
-  const loadRecentSongs = async () => {
+  const loadUserSongs = async () => {
     try {
-      const response = await songsAPI.getSongs({ limit: 6 });
-      setRecentSongs(response.songs);
+      const songs = await songsAPI.getMySongs();
+      setUserSongs(songs);
     } catch (error) {
-      console.error('Failed to load recent songs:', error);
+      console.error('Failed to load user songs:', error);
     }
   };
 
-  const loadSuggestions = async (genre: string, theme?: string) => {
-    try {
-      const suggestions = await songsAPI.getGenerationSuggestions(genre, theme);
-      setSuggestions(suggestions);
-    } catch (error) {
-      console.error('Failed to load suggestions:', error);
-    }
-  };
-
-  const handleFormChange = (field: keyof GenerationForm, value: any) => {
-    setForm(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleLyricsFormChange = (field: string, value: any) => {
-    setLyricsForm(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleInstrumentalFormChange = (field: string, value: any) => {
-    setInstrumentalForm(prev => ({ ...prev, [field]: value }));
-  };
-
-  const generateCompleteSong = async () => {
-    console.log('Generate button clicked!');
-    console.log('Form data:', form);
-    
-    if (!form.title.trim()) {
-      alert('Please enter a song title');
+  const handleFullSongGeneration = async () => {
+    if (!fullSongForm.title.trim()) {
+      setError('Please enter a song title');
       return;
     }
 
-    setIsGenerating(true);
-    setGenerationProgress('Initializing song generation...');
-    setGeneratedSong(null);
+    setIsLoading(true);
+    setError(null);
 
     try {
-      console.log('Starting song generation...');
-      setGenerationProgress('Generating lyrics...');
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate progress
-
-      setGenerationProgress('Creating musical arrangement...');
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      setGenerationProgress('Synthesizing audio...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      console.log('Calling API with data:', {
-        title: form.title,
-        genre: form.genre,
-        style: form.style,
-        theme: form.theme || undefined,
-        voice_type: form.voice_type,
-        custom_prompt: form.custom_prompt || undefined,
-        include_audio: form.include_audio,
-        include_midi: form.include_midi
-      });
-
-      const song = await songsAPI.generateSong({
-        title: form.title,
-        genre: form.genre,
-        style: form.style,
-        theme: form.theme || undefined,
-        voice_type: form.voice_type,
-        custom_prompt: form.custom_prompt || undefined,
-        include_audio: form.include_audio,
-        include_midi: form.include_midi
-      });
-
-      console.log('API response:', song);
-      setGeneratedSong(song);
-      setGenerationProgress('Song generation complete!');
-      loadRecentSongs(); // Refresh recent songs
+      const result = await songsAPI.generateSong(fullSongForm);
+      setResult({ type: 'full', data: result });
     } catch (error: any) {
-      console.error('Failed to generate song:', error);
-      console.error('Error details:', error.response);
-      setGenerationProgress(`Error: ${error.response?.data?.detail || error.message || 'Failed to generate song'}`);
+      setError(error.response?.data?.detail || 'Failed to generate song');
     } finally {
-      setIsGenerating(false);
+      setIsLoading(false);
     }
   };
 
-  const generateLyricsOnly = async () => {
+  const handleLyricsGeneration = async () => {
     if (!lyricsForm.title.trim()) {
-      alert('Please enter a song title');
+      setError('Please enter a song title');
       return;
     }
 
-    setIsGenerating(true);
-    setGenerationProgress('Generating lyrics...');
-    setGeneratedLyrics(null);
+    setIsLoading(true);
+    setError(null);
 
     try {
       const result = await songsAPI.generateLyricsOnly(lyricsForm);
-      setGeneratedLyrics(result);
-      setGenerationProgress('Lyrics generation complete!');
+      setResult({ type: 'lyrics', data: result });
     } catch (error: any) {
-      console.error('Failed to generate lyrics:', error);
-      setGenerationProgress(`Error: ${error.response?.data?.detail || 'Failed to generate lyrics'}`);
+      setError(error.response?.data?.detail || 'Failed to generate lyrics');
     } finally {
-      setIsGenerating(false);
+      setIsLoading(false);
     }
   };
 
-  const generateInstrumentalOnly = async () => {
+  const handleInstrumentalGeneration = async () => {
     if (!instrumentalForm.title.trim()) {
-      alert('Please enter a track title');
+      setError('Please enter a song title');
       return;
     }
 
-    setIsGenerating(true);
-    setGenerationProgress('Generating instrumental track...');
-    setGeneratedInstrumental(null);
+    setIsLoading(true);
+    setError(null);
 
     try {
       const result = await songsAPI.generateInstrumental(instrumentalForm);
-      setGeneratedInstrumental(result);
-      setGenerationProgress('Instrumental generation complete!');
+      setResult({ type: 'instrumental', data: result });
     } catch (error: any) {
-      console.error('Failed to generate instrumental:', error);
-      setGenerationProgress(`Error: ${error.response?.data?.detail || 'Failed to generate instrumental'}`);
+      setError(error.response?.data?.detail || 'Failed to generate instrumental');
     } finally {
-      setIsGenerating(false);
+      setIsLoading(false);
     }
   };
 
-  const applySuggestion = (field: string, value: any) => {
-    if (activeTab === 'generate') {
-      handleFormChange(field as keyof GenerationForm, value);
-    } else if (activeTab === 'lyrics') {
-      handleLyricsFormChange(field, value);
-    } else if (activeTab === 'instrumental') {
-      handleInstrumentalFormChange(field, value);
+  const handleRemixGeneration = async () => {
+    if (!remixForm.song_id) {
+      setError('Please select a song to remix');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await songsAPI.remixSong(parseInt(remixForm.song_id), {
+        new_genre: remixForm.new_genre,
+        new_tempo: remixForm.new_tempo,
+        new_key: remixForm.new_key,
+      });
+      setResult({ type: 'remix', data: result });
+    } catch (error: any) {
+      setError(error.response?.data?.detail || 'Failed to remix song');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  return (
-    <div className="home-container">
-      {/* Hero Section */}
-      <div className="hero-section">
-        <div className="hero-content">
-          <button 
-            onClick={() => navigate('/')}
-            className="back-button"
-            style={{
-              position: 'absolute',
-              top: '20px',
-              left: '20px',
-              background: 'rgba(255, 255, 255, 0.2)',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '8px 16px',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '14px',
-              backdropFilter: 'blur(10px)'
-            }}
-          >
-            ← Back to Dashboard
-          </button>
-          <div className="hero-icon">🎵</div>
-          <h1>Music Generation</h1>
-          <p>Create AI-powered music with advanced algorithms and machine learning.</p>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="main-content">
-        {/* Generation Tabs */}
-        <div className="generation-tabs">
-          <button
-            className={`tab-button ${activeTab === 'generate' ? 'active' : ''}`}
-            onClick={() => setActiveTab('generate')}
-          >
-            Complete Song
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'lyrics' ? 'active' : ''}`}
-            onClick={() => setActiveTab('lyrics')}
-          >
-            Lyrics Only
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'instrumental' ? 'active' : ''}`}
-            onClick={() => setActiveTab('instrumental')}
-          >
-            Instrumental
-          </button>
-        </div>
-
-        <div className="content-grid">
-          {/* Generation Form */}
-          <div className="generation-panel">
-            {activeTab === 'generate' && (
-              <div className="form-section">
-                <h3>Generate Complete Song</h3>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label>Song Title *</label>
-                    <input
-                      type="text"
-                      value={form.title}
-                      onChange={(e) => handleFormChange('title', e.target.value)}
-                      placeholder="Enter song title..."
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Genre</label>
-                    <select
-                      value={form.genre}
-                      onChange={(e) => handleFormChange('genre', e.target.value as Genre)}
-                      className="form-select"
-                    >
-                      {GENRES.map(genre => (
-                        <option key={genre} value={genre}>{genre}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Style</label>
-                    <select
-                      value={form.style}
-                      onChange={(e) => handleFormChange('style', e.target.value as Style)}
-                      className="form-select"
-                    >
-                      {STYLES.map(style => (
-                        <option key={style} value={style}>{style}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Voice Type</label>
-                    <select
-                      value={form.voice_type}
-                      onChange={(e) => handleFormChange('voice_type', e.target.value as VoiceType)}
-                      className="form-select"
-                    >
-                      {VOICE_TYPES.map(voice => (
-                        <option key={voice} value={voice}>{voice}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Theme</label>
-                    <input
-                      type="text"
-                      value={form.theme}
-                      onChange={(e) => handleFormChange('theme', e.target.value)}
-                      placeholder="e.g., Love, Freedom, Adventure..."
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Key</label>
-                    <select
-                      value={form.key}
-                      onChange={(e) => handleFormChange('key', e.target.value)}
-                      className="form-select"
-                    >
-                      {keys.map(key => (
-                        <option key={key} value={key}>{key}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Tempo (BPM)</label>
-                    <input
-                      type="number"
-                      value={form.tempo}
-                      onChange={(e) => handleFormChange('tempo', parseInt(e.target.value))}
-                      min="60"
-                      max="200"
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Duration (seconds)</label>
-                    <input
-                      type="number"
-                      value={form.duration}
-                      onChange={(e) => handleFormChange('duration', parseInt(e.target.value))}
-                      min="30"
-                      max="600"
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group full-width">
-                    <label>Custom Prompt (Optional)</label>
-                    <textarea
-                      value={form.custom_prompt}
-                      onChange={(e) => handleFormChange('custom_prompt', e.target.value)}
-                      placeholder="Additional instructions for the AI..."
-                      className="form-textarea"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={form.include_audio}
-                        onChange={(e) => handleFormChange('include_audio', e.target.checked)}
-                      />
-                      Generate Audio
-                    </label>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={form.include_midi}
-                        onChange={(e) => handleFormChange('include_midi', e.target.checked)}
-                      />
-                      Generate MIDI
-                    </label>
-                  </div>
-                </div>
-
-                <button
-                  onClick={generateCompleteSong}
-                  disabled={isGenerating || !form.title.trim()}
-                  className="generate-button"
-                >
-                  {isGenerating ? 'Generating...' : 'Generate Music'}
-                </button>
-              </div>
-            )}
-
-            {activeTab === 'lyrics' && (
-              <div className="form-section">
-                <h3>Generate Lyrics Only</h3>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label>Song Title *</label>
-                    <input
-                      type="text"
-                      value={lyricsForm.title}
-                      onChange={(e) => handleLyricsFormChange('title', e.target.value)}
-                      placeholder="Enter song title..."
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Genre</label>
-                    <select
-                      value={lyricsForm.genre}
-                      onChange={(e) => handleLyricsFormChange('genre', e.target.value)}
-                      className="form-select"
-                    >
-                      {GENRES.map(genre => (
-                        <option key={genre} value={genre}>{genre}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Style</label>
-                    <select
-                      value={lyricsForm.style}
-                      onChange={(e) => handleLyricsFormChange('style', e.target.value)}
-                      className="form-select"
-                    >
-                      {STYLES.map(style => (
-                        <option key={style} value={style}>{style}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Theme</label>
-                    <input
-                      type="text"
-                      value={lyricsForm.theme}
-                      onChange={(e) => handleLyricsFormChange('theme', e.target.value)}
-                      placeholder="e.g., Love, Freedom, Adventure..."
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group full-width">
-                    <label>Custom Prompt (Optional)</label>
-                    <textarea
-                      value={lyricsForm.custom_prompt}
-                      onChange={(e) => handleLyricsFormChange('custom_prompt', e.target.value)}
-                      placeholder="Additional instructions for lyrics generation..."
-                      className="form-textarea"
-                      rows={3}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={generateLyricsOnly}
-                  disabled={isGenerating || !lyricsForm.title.trim()}
-                  className="generate-button"
-                >
-                  {isGenerating ? 'Generating...' : 'Generate Lyrics'}
-                </button>
-              </div>
-            )}
-
-            {activeTab === 'instrumental' && (
-              <div className="form-section">
-                <h3>Generate Instrumental</h3>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label>Track Title *</label>
-                    <input
-                      type="text"
-                      value={instrumentalForm.title}
-                      onChange={(e) => handleInstrumentalFormChange('title', e.target.value)}
-                      placeholder="Enter track title..."
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Genre</label>
-                    <select
-                      value={instrumentalForm.genre}
-                      onChange={(e) => handleInstrumentalFormChange('genre', e.target.value)}
-                      className="form-select"
-                    >
-                      {GENRES.map(genre => (
-                        <option key={genre} value={genre}>{genre}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Style</label>
-                    <select
-                      value={instrumentalForm.style}
-                      onChange={(e) => handleInstrumentalFormChange('style', e.target.value)}
-                      className="form-select"
-                    >
-                      {STYLES.map(style => (
-                        <option key={style} value={style}>{style}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Key</label>
-                    <select
-                      value={instrumentalForm.key}
-                      onChange={(e) => handleInstrumentalFormChange('key', e.target.value)}
-                      className="form-select"
-                    >
-                      {keys.map(key => (
-                        <option key={key} value={key}>{key}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Tempo (BPM)</label>
-                    <input
-                      type="number"
-                      value={instrumentalForm.tempo}
-                      onChange={(e) => handleInstrumentalFormChange('tempo', parseInt(e.target.value))}
-                      min="60"
-                      max="200"
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Duration (seconds)</label>
-                    <input
-                      type="number"
-                      value={instrumentalForm.duration}
-                      onChange={(e) => handleInstrumentalFormChange('duration', parseInt(e.target.value))}
-                      min="30"
-                      max="600"
-                      className="form-input"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={instrumentalForm.include_audio}
-                        onChange={(e) => handleInstrumentalFormChange('include_audio', e.target.checked)}
-                      />
-                      Generate Audio
-                    </label>
-                  </div>
-                </div>
-
-                <button
-                  onClick={generateInstrumentalOnly}
-                  disabled={isGenerating || !instrumentalForm.title.trim()}
-                  className="generate-button"
-                >
-                  {isGenerating ? 'Generating...' : 'Generate Instrumental'}
-                </button>
-              </div>
-            )}
-
-            {/* Generation Progress */}
-            {isGenerating && (
-              <div className="progress-section">
-                <div className="progress-bar">
-                  <div className="progress-fill"></div>
-                </div>
-                <p className="progress-text">{generationProgress}</p>
-              </div>
-            )}
+  const renderFullSongForm = () => (
+    <div className="form-container">
+      <form className="generation-form" onSubmit={(e) => { e.preventDefault(); handleFullSongGeneration(); }}>
+        <div className="form-section">
+          <h3>🎵 Song Details</h3>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Song Title *</label>
+              <input
+                type="text"
+                value={fullSongForm.title}
+                onChange={(e) => setFullSongForm({ ...fullSongForm, title: e.target.value })}
+                placeholder="Enter your song title..."
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Genre</label>
+              <select
+                value={fullSongForm.genre}
+                onChange={(e) => setFullSongForm({ ...fullSongForm, genre: e.target.value })}
+              >
+                {GENRES.map(genre => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </select>
+            </div>
           </div>
-
-          {/* Suggestions Panel */}
-          <div className="suggestions-panel">
-            <h3>AI Suggestions</h3>
-            {suggestions && (
-              <div className="suggestions-content">
-                {suggestions.recommended_tempos.length > 0 && (
-                  <div className="suggestion-group">
-                    <h4>Recommended Tempos</h4>
-                    <div className="suggestion-chips">
-                      {suggestions.recommended_tempos.map(tempo => (
-                        <button
-                          key={tempo}
-                          className="suggestion-chip"
-                          onClick={() => applySuggestion('tempo', tempo)}
-                        >
-                          {tempo} BPM
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {suggestions.recommended_keys.length > 0 && (
-                  <div className="suggestion-group">
-                    <h4>Recommended Keys</h4>
-                    <div className="suggestion-chips">
-                      {suggestions.recommended_keys.map(key => (
-                        <button
-                          key={key}
-                          className="suggestion-chip"
-                          onClick={() => applySuggestion('key', key)}
-                        >
-                          {key}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {suggestions.recommended_styles.length > 0 && (
-                  <div className="suggestion-group">
-                    <h4>Recommended Styles</h4>
-                    <div className="suggestion-chips">
-                      {suggestions.recommended_styles.map(style => (
-                        <button
-                          key={style}
-                          className="suggestion-chip"
-                          onClick={() => applySuggestion('style', style)}
-                        >
-                          {style}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {suggestions.theme_suggestions.length > 0 && (
-                  <div className="suggestion-group">
-                    <h4>Theme Ideas</h4>
-                    <div className="suggestion-chips">
-                      {suggestions.theme_suggestions.map(theme => (
-                        <button
-                          key={theme}
-                          className="suggestion-chip"
-                          onClick={() => applySuggestion('theme', theme)}
-                        >
-                          {theme}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+          <div className="form-row">
+            <div className="form-group">
+              <label>Style</label>
+              <select
+                value={fullSongForm.style}
+                onChange={(e) => setFullSongForm({ ...fullSongForm, style: e.target.value })}
+              >
+                {STYLES.map(style => (
+                  <option key={style} value={style}>{style}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Voice Type</label>
+              <select
+                value={fullSongForm.voice_type}
+                onChange={(e) => setFullSongForm({ ...fullSongForm, voice_type: e.target.value })}
+              >
+                {VOICE_TYPES.map(voice => (
+                  <option key={voice} value={voice}>{voice}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Theme (Optional)</label>
+            <input
+              type="text"
+              value={fullSongForm.theme}
+              onChange={(e) => setFullSongForm({ ...fullSongForm, theme: e.target.value })}
+              placeholder="e.g., love, adventure, nostalgia..."
+            />
+          </div>
+          <div className="form-group">
+            <label>Custom Prompt (Optional)</label>
+            <textarea
+              value={fullSongForm.custom_prompt}
+              onChange={(e) => setFullSongForm({ ...fullSongForm, custom_prompt: e.target.value })}
+              placeholder="Describe any specific requirements or ideas for your song..."
+              rows={3}
+            />
           </div>
         </div>
 
-        {/* Results Section */}
-        {(generatedSong || generatedLyrics || generatedInstrumental) && (
-          <div className="results-section">
-            <h3>Generation Results</h3>
-            
-            {generatedSong && (
-              <div className="result-card">
-                <div className="result-header">
-                  <h4>{generatedSong.title}</h4>
-                  <span className="result-genre">{generatedSong.genre}</span>
-                </div>
-                <div className="result-content">
-                  {generatedSong.lyrics && (
-                    <div className="lyrics-display">
-                      <h5>Lyrics:</h5>
-                      <pre className="lyrics-text">{generatedSong.lyrics}</pre>
-                    </div>
-                  )}
-                  <div className="result-metadata">
-                    <span>Duration: {formatDuration(generatedSong.duration || 0)}</span>
-                    <span>Tempo: {generatedSong.tempo} BPM</span>
-                    <span>Key: {generatedSong.key_signature}</span>
-                  </div>
-                  {generatedSong.audio_file_path && (
-                    <div className="audio-player">
-                      <audio controls>
-                        <source src={generatedSong.audio_file_path} type="audio/wav" />
-                        Your browser does not support the audio element.
-                      </audio>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {generatedLyrics && (
-              <div className="result-card">
-                <div className="result-header">
-                  <h4>Generated Lyrics</h4>
-                </div>
-                <div className="result-content">
-                  <div className="lyrics-display">
-                    <pre className="lyrics-text">{generatedLyrics.lyrics}</pre>
-                  </div>
-                  <div className="result-metadata">
-                    <span>Word Count: {generatedLyrics.metadata?.word_count}</span>
-                    <span>Est. Duration: {formatDuration(generatedLyrics.metadata?.estimated_duration || 0)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {generatedInstrumental && (
-              <div className="result-card">
-                <div className="result-header">
-                  <h4>{generatedInstrumental.title}</h4>
-                  <span className="result-genre">{generatedInstrumental.genre}</span>
-                </div>
-                <div className="result-content">
-                  <div className="result-metadata">
-                    <span>Duration: {formatDuration(generatedInstrumental.duration || 0)}</span>
-                    <span>Tempo: {generatedInstrumental.tempo} BPM</span>
-                    <span>Key: {generatedInstrumental.key}</span>
-                  </div>
-                  {generatedInstrumental.audio_file_path && (
-                    <div className="audio-player">
-                      <audio controls>
-                        <source src={generatedInstrumental.audio_file_path} type="audio/wav" />
-                        Your browser does not support the audio element.
-                      </audio>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+        <div className="form-section">
+          <h3>🎼 Output Options</h3>
+          <div className="checkbox-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={fullSongForm.include_audio}
+                onChange={(e) => setFullSongForm({ ...fullSongForm, include_audio: e.target.checked })}
+              />
+              <span>Generate Audio File</span>
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={fullSongForm.include_midi}
+                onChange={(e) => setFullSongForm({ ...fullSongForm, include_midi: e.target.checked })}
+              />
+              <span>Generate MIDI File</span>
+            </label>
           </div>
-        )}
+        </div>
 
-        {/* Recent Songs */}
-        {recentSongs.length > 0 && (
-          <div className="recent-songs-section">
-            <h3>Recent Generations</h3>
-            <div className="songs-grid">
-              {recentSongs.map(song => (
-                <div key={song.id} className="song-card">
-                  <div className="song-header">
-                    <h4>{song.title}</h4>
-                    <span className="song-genre">{song.genre}</span>
-                  </div>
-                  <div className="song-metadata">
-                    {song.duration && <span>{formatDuration(song.duration)}</span>}
-                    {song.tempo && <span>{song.tempo} BPM</span>}
-                    {song.is_generated && <span className="generated-badge">AI Generated</span>}
-                  </div>
-                  {song.audio_file_path && (
-                    <div className="song-audio">
-                      <audio controls>
-                        <source src={song.audio_file_path} type="audio/wav" />
-                        Your browser does not support the audio element.
-                      </audio>
-                    </div>
-                  )}
-                </div>
+        <button
+          type="submit"
+          className="generate-btn primary"
+          disabled={isLoading}
+        >
+          {isLoading ? '🎵 Generating...' : '🎵 Generate Full Song'}
+        </button>
+      </form>
+    </div>
+  );
+
+  const renderLyricsForm = () => (
+    <div className="form-container">
+      <form className="generation-form" onSubmit={(e) => { e.preventDefault(); handleLyricsGeneration(); }}>
+        <div className="form-section">
+          <h3>📝 Lyrics Generation</h3>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Song Title *</label>
+              <input
+                type="text"
+                value={lyricsForm.title}
+                onChange={(e) => setLyricsForm({ ...lyricsForm, title: e.target.value })}
+                placeholder="Enter your song title..."
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Genre</label>
+              <select
+                value={lyricsForm.genre}
+                onChange={(e) => setLyricsForm({ ...lyricsForm, genre: e.target.value })}
+              >
+                {GENRES.map(genre => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Style</label>
+              <select
+                value={lyricsForm.style}
+                onChange={(e) => setLyricsForm({ ...lyricsForm, style: e.target.value })}
+              >
+                {STYLES.map(style => (
+                  <option key={style} value={style}>{style}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Theme (Optional)</label>
+              <input
+                type="text"
+                value={lyricsForm.theme}
+                onChange={(e) => setLyricsForm({ ...lyricsForm, theme: e.target.value })}
+                placeholder="e.g., love, adventure, nostalgia..."
+              />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Custom Prompt (Optional)</label>
+            <textarea
+              value={lyricsForm.custom_prompt}
+              onChange={(e) => setLyricsForm({ ...lyricsForm, custom_prompt: e.target.value })}
+              placeholder="Describe the story, mood, or specific elements you want in the lyrics..."
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="generate-btn secondary"
+          disabled={isLoading}
+        >
+          {isLoading ? '📝 Generating...' : '📝 Generate Lyrics'}
+        </button>
+      </form>
+    </div>
+  );
+
+  const renderInstrumentalForm = () => (
+    <div className="form-container">
+      <form className="generation-form" onSubmit={(e) => { e.preventDefault(); handleInstrumentalGeneration(); }}>
+        <div className="form-section">
+          <h3>🎼 Instrumental Generation</h3>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Track Title *</label>
+              <input
+                type="text"
+                value={instrumentalForm.title}
+                onChange={(e) => setInstrumentalForm({ ...instrumentalForm, title: e.target.value })}
+                placeholder="Enter track title..."
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Genre</label>
+              <select
+                value={instrumentalForm.genre}
+                onChange={(e) => setInstrumentalForm({ ...instrumentalForm, genre: e.target.value })}
+              >
+                {GENRES.map(genre => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Key</label>
+              <select
+                value={instrumentalForm.key}
+                onChange={(e) => setInstrumentalForm({ ...instrumentalForm, key: e.target.value })}
+              >
+                {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map(key => (
+                  <option key={key} value={key}>{key}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Tempo (BPM)</label>
+              <input
+                type="number"
+                value={instrumentalForm.tempo}
+                onChange={(e) => setInstrumentalForm({ ...instrumentalForm, tempo: parseInt(e.target.value) })}
+                min="60"
+                max="200"
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Duration (seconds)</label>
+              <input
+                type="number"
+                value={instrumentalForm.duration}
+                onChange={(e) => setInstrumentalForm({ ...instrumentalForm, duration: parseInt(e.target.value) })}
+                min="30"
+                max="600"
+              />
+            </div>
+            <div className="form-group">
+              <label>Style</label>
+              <select
+                value={instrumentalForm.style}
+                onChange={(e) => setInstrumentalForm({ ...instrumentalForm, style: e.target.value })}
+              >
+                {STYLES.map(style => (
+                  <option key={style} value={style}>{style}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="checkbox-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={instrumentalForm.include_audio}
+                onChange={(e) => setInstrumentalForm({ ...instrumentalForm, include_audio: e.target.checked })}
+              />
+              <span>Generate Audio File</span>
+            </label>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="generate-btn tertiary"
+          disabled={isLoading}
+        >
+          {isLoading ? '🎼 Generating...' : '🎼 Generate Instrumental'}
+        </button>
+      </form>
+    </div>
+  );
+
+  const renderRemixForm = () => (
+    <div className="form-container">
+      <form className="generation-form" onSubmit={(e) => { e.preventDefault(); handleRemixGeneration(); }}>
+        <div className="form-section">
+          <h3>🔄 Remix Existing Song</h3>
+          <div className="form-group">
+            <label>Select Song to Remix *</label>
+            <select
+              value={remixForm.song_id}
+              onChange={(e) => setRemixForm({ ...remixForm, song_id: e.target.value })}
+              required
+            >
+              <option value="">Choose a song...</option>
+              {userSongs.map(song => (
+                <option key={song.id} value={song.id}>{song.title} ({song.genre})</option>
               ))}
+            </select>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>New Genre</label>
+              <select
+                value={remixForm.new_genre}
+                onChange={(e) => setRemixForm({ ...remixForm, new_genre: e.target.value })}
+              >
+                {GENRES.map(genre => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>New Tempo (BPM)</label>
+              <input
+                type="number"
+                value={remixForm.new_tempo}
+                onChange={(e) => setRemixForm({ ...remixForm, new_tempo: parseInt(e.target.value) })}
+                min="60"
+                max="200"
+              />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>New Key</label>
+            <select
+              value={remixForm.new_key}
+              onChange={(e) => setRemixForm({ ...remixForm, new_key: e.target.value })}
+            >
+              {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map(key => (
+                <option key={key} value={key}>{key}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="generate-btn"
+          disabled={isLoading || !remixForm.song_id}
+        >
+          {isLoading ? '🔄 Remixing...' : '🔄 Create Remix'}
+        </button>
+      </form>
+    </div>
+  );
+
+  const renderResults = () => {
+    if (!result) return null;
+
+    return (
+      <div className="results-container">
+        {result.type === 'lyrics' && (
+          <div className="result-section">
+            <h2 className="result-title">📝 Generated Lyrics</h2>
+            <div className="lyrics-content">
+              <pre>{result.data.lyrics}</pre>
             </div>
           </div>
         )}
+
+        {result.type === 'instrumental' && (
+          <div className="result-section">
+            <h2 className="result-title">🎼 Generated Instrumental</h2>
+            <p>Title: {result.data.title}</p>
+            <p>Genre: {result.data.genre} | Key: {result.data.key} | Tempo: {result.data.tempo} BPM</p>
+            {result.data.audio_file_path && (
+              <div className="audio-player">
+                <audio controls>
+                  <source src={result.data.audio_file_path} type="audio/mpeg" />
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            )}
+          </div>
+        )}
+
+        {result.type === 'full' && (
+          <div className="result-section">
+            <h2 className="result-title">🎵 Generated Song</h2>
+            <p>Title: {result.data.title}</p>
+            <p>Genre: {result.data.genre} | Style: {result.data.style}</p>
+            {result.data.lyrics && (
+              <div className="lyrics-content">
+                <pre>{result.data.lyrics}</pre>
+              </div>
+            )}
+            {result.data.audio_file_path && (
+              <div className="audio-player">
+                <audio controls>
+                  <source src={result.data.audio_file_path} type="audio/mpeg" />
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            )}
+          </div>
+        )}
+
+        {result.type === 'remix' && (
+          <div className="result-section">
+            <h2 className="result-title">🔄 Remixed Song</h2>
+            <p>Title: {result.data.title}</p>
+            <p>Original: {result.data.original_genre} → New: {result.data.new_genre}</p>
+            {result.data.audio_file_path && (
+              <div className="audio-player">
+                <audio controls>
+                  <source src={result.data.audio_file_path} type="audio/mpeg" />
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="home-container">
+        <div className="header-section">
+          <h1 className="page-title">Welcome to GenXcover</h1>
+          <p className="page-subtitle">
+            Create amazing music with AI-powered generation tools. Please log in to get started.
+          </p>
+          <div style={{ marginTop: '2rem' }}>
+            <button 
+              className="generate-btn primary" 
+              onClick={() => navigate('/login')}
+              style={{ marginRight: '1rem' }}
+            >
+              Login
+            </button>
+            <button 
+              className="generate-btn secondary" 
+              onClick={() => navigate('/register')}
+            >
+              Sign Up
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="home-container">
+      <div className="header-section">
+        <h1 className="page-title">AI Music Generation</h1>
+        <p className="page-subtitle">
+          Create original music, lyrics, and instrumentals with the power of artificial intelligence.
+          Choose your generation type and let creativity flow.
+        </p>
+      </div>
+
+      <div className="tabs-container">
+        <div className="tabs">
+          <button
+            className={`tab ${activeTab === 'full' ? 'active' : ''}`}
+            onClick={() => setActiveTab('full')}
+          >
+            🎵 Full Song
+          </button>
+          <button
+            className={`tab ${activeTab === 'lyrics' ? 'active' : ''}`}
+            onClick={() => setActiveTab('lyrics')}
+          >
+            📝 Lyrics Only
+          </button>
+          <button
+            className={`tab ${activeTab === 'instrumental' ? 'active' : ''}`}
+            onClick={() => setActiveTab('instrumental')}
+          >
+            🎼 Instrumental
+          </button>
+          <button
+            className={`tab ${activeTab === 'remix' ? 'active' : ''}`}
+            onClick={() => setActiveTab('remix')}
+          >
+            🔄 Remix
+          </button>
+        </div>
+      </div>
+
+      <div className="content-container">
+        {error && (
+          <div className="error-message">
+            <span className="error-icon">⚠️</span>
+            {error}
+          </div>
+        )}
+
+        {activeTab === 'full' && renderFullSongForm()}
+        {activeTab === 'lyrics' && renderLyricsForm()}
+        {activeTab === 'instrumental' && renderInstrumentalForm()}
+        {activeTab === 'remix' && renderRemixForm()}
+
+        {renderResults()}
       </div>
     </div>
   );
