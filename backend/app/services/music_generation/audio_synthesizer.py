@@ -149,7 +149,7 @@ class AudioSynthesizer:
         
         # Normalize to prevent clipping
         max_amplitude = np.max(np.abs(mixed_audio))
-        if max_amplitude > 0:
+        if float(max_amplitude) > 0:
             mixed_audio = mixed_audio / max_amplitude * 0.8  # Leave some headroom
         
         return mixed_audio
@@ -500,7 +500,7 @@ class AudioSynthesizer:
         
         # Normalize
         max_amplitude = np.max(np.abs(mixed))
-        if max_amplitude > 0:
+        if float(max_amplitude) > 0:
             mixed = mixed / max_amplitude * 0.8
         
         return mixed
