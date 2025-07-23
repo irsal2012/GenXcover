@@ -1,0 +1,26 @@
+{
+  "file_path": "backend/uploads/audio/Quick Test_20250723_134123.wav",
+  "duration": 120.0,
+  "sample_rate": 44100,
+  "channels": 2,
+  "bit_depth": 16,
+  "tempo": 120,
+  "key": "C",
+  "creation_timestamp": "2025-07-23T13:41:23.624071",
+  "synthesis_engine": "GenXcover Neural Synthesizer v1.0",
+  "audio_quality": "High",
+  "dynamic_range": "Good",
+  "frequency_response": "20Hz - 20kHz",
+  "peak_level": -3.0,
+  "rms_level": -18.0,
+  "stereo_width": 0.8,
+  "vocals": {
+    "voice_type": "Male",
+    "vocal_range": [
+      80,
+      300
+    ],
+    "clarity_score": 0.92,
+    "expression_score": 0.78
+  }
+}

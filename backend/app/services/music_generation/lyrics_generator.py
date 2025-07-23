@@ -27,20 +27,24 @@ class LyricsGenerator:
         prompt = self._build_lyrics_prompt(title, genre, theme, style, custom_prompt)
         
         try:
-            response = await self.client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a professional songwriter and lyricist. Create engaging, creative, and well-structured song lyrics that match the given requirements. Format the output with clear verse/chorus/bridge structure."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_tokens=1000,
-                temperature=0.8
+            # Add timeout to prevent hanging
+            response = await asyncio.wait_for(
+                self.client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a professional songwriter and lyricist. Create engaging, creative, and well-structured song lyrics that match the given requirements. Format the output with clear verse/chorus/bridge structure."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    max_tokens=1000,
+                    temperature=0.8
+                ),
+                timeout=30.0  # 30 second timeout
             )
             
             lyrics = response.choices[0].message.content.strip()
@@ -61,8 +65,12 @@ class LyricsGenerator:
                 }
             }
             
+        except asyncio.TimeoutError:
+            print("⚠️ OpenAI API timeout, falling back to demo lyrics...")
+            return self._generate_demo_lyrics(title, genre, theme, style)
         except Exception as e:
-            raise Exception(f"Failed to generate lyrics: {str(e)}")
+            print(f"⚠️ OpenAI API error: {str(e)}, falling back to demo lyrics...")
+            return self._generate_demo_lyrics(title, genre, theme, style)
 
     def _build_lyrics_prompt(
         self,
