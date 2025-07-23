@@ -214,8 +214,9 @@ class AudioSynthesizer:
                     audio[start_sample:end_sample] += chord_audio[:end_sample-start_sample]
         
         # Normalize to prevent clipping
-        if np.max(np.abs(audio)) > 0:
-            audio = audio / np.max(np.abs(audio)) * 0.8
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val * 0.8
         
         return audio
     
@@ -241,8 +242,9 @@ class AudioSynthesizer:
                 audio[start_sample:end_sample] += drum_audio[:end_sample-start_sample]
         
         # Normalize
-        if np.max(np.abs(audio)) > 0:
-            audio = audio / np.max(np.abs(audio)) * 0.9
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val * 0.9
         
         return audio
     
@@ -283,8 +285,9 @@ class AudioSynthesizer:
         audio = self._apply_vocal_effects(audio, profile)
         
         # Normalize
-        if np.max(np.abs(audio)) > 0:
-            audio = audio / np.max(np.abs(audio)) * 0.7
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val * 0.7
         
         return audio
     
@@ -355,8 +358,10 @@ class AudioSynthesizer:
                 chord_audio += note_audio
         
         # Normalize chord
-        if chord_audio is not None and np.max(np.abs(chord_audio)) > 0:
-            chord_audio = chord_audio / np.max(np.abs(chord_audio)) * 0.8
+        if chord_audio is not None:
+            max_val = np.max(np.abs(chord_audio))
+            if max_val > 0:
+                chord_audio = chord_audio / max_val * 0.8
         
         return chord_audio if chord_audio is not None else np.zeros(int(duration * self.sample_rate))
     
@@ -520,7 +525,7 @@ class AudioSynthesizer:
         """Save audio to file"""
         
         # Create uploads directory
-        uploads_dir = Path("uploads/audio")
+        uploads_dir = Path("backend/uploads/audio")
         uploads_dir.mkdir(parents=True, exist_ok=True)
         
         # Generate filename
@@ -532,9 +537,8 @@ class AudioSynthesizer:
         # Convert to 16-bit integers
         audio_int = (audio * 32767).astype(np.int16)
         
-        # Save as WAV (simplified - would use proper audio libraries in production)
-        # For now, save as numpy array that can be converted later
-        np.save(str(file_path).replace(f'.{output_format}', '.npy'), audio_int)
+        # Save as WAV file using a simple WAV writer
+        self._write_wav_file(str(file_path), audio_int, self.sample_rate)
         
         # Also save metadata
         metadata = {
@@ -548,7 +552,70 @@ class AudioSynthesizer:
         with open(str(file_path).replace(f'.{output_format}', '_metadata.json'), 'w') as f:
             json.dump(metadata, f, indent=2)
         
-        return str(file_path)
+        # Return web-accessible path
+        web_path = str(file_path).replace("backend/", "/")
+        return web_path
+    
+    def _write_wav_file(self, filename: str, audio_data: np.ndarray, sample_rate: int):
+        """Write audio data to WAV file"""
+        import struct
+        import wave
+        
+        try:
+            # Ensure audio is in the right format
+            if audio_data.dtype != np.int16:
+                audio_data = audio_data.astype(np.int16)
+            
+            # Create WAV file
+            with wave.open(filename, 'wb') as wav_file:
+                # Set parameters
+                wav_file.setnchannels(1)  # Mono
+                wav_file.setsampwidth(2)  # 16-bit
+                wav_file.setframerate(sample_rate)
+                
+                # Write audio data
+                wav_file.writeframes(audio_data.tobytes())
+                
+        except Exception as e:
+            # Fallback: create a simple WAV file manually
+            self._write_simple_wav(filename, audio_data, sample_rate)
+    
+    def _write_simple_wav(self, filename: str, audio_data: np.ndarray, sample_rate: int):
+        """Write a simple WAV file manually"""
+        import struct
+        
+        # Ensure audio is int16
+        if audio_data.dtype != np.int16:
+            audio_data = audio_data.astype(np.int16)
+        
+        # WAV file parameters
+        channels = 1
+        bits_per_sample = 16
+        byte_rate = sample_rate * channels * bits_per_sample // 8
+        block_align = channels * bits_per_sample // 8
+        data_size = len(audio_data) * 2  # 2 bytes per sample
+        file_size = 36 + data_size
+        
+        with open(filename, 'wb') as f:
+            # WAV header
+            f.write(b'RIFF')
+            f.write(struct.pack('<I', file_size))
+            f.write(b'WAVE')
+            
+            # Format chunk
+            f.write(b'fmt ')
+            f.write(struct.pack('<I', 16))  # Chunk size
+            f.write(struct.pack('<H', 1))   # Audio format (PCM)
+            f.write(struct.pack('<H', channels))
+            f.write(struct.pack('<I', sample_rate))
+            f.write(struct.pack('<I', byte_rate))
+            f.write(struct.pack('<H', block_align))
+            f.write(struct.pack('<H', bits_per_sample))
+            
+            # Data chunk
+            f.write(b'data')
+            f.write(struct.pack('<I', data_size))
+            f.write(audio_data.tobytes())
     
     def _note_to_frequency(self, note: str) -> float:
         """Convert note name to frequency"""
