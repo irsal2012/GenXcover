@@ -54,6 +54,16 @@ async def list_songs():
         "total": len(songs_storage)
     }
 
+@router.get("/my-songs")
+async def get_my_songs(skip: int = 0, limit: int = 20):
+    """Get current user's songs"""
+    # For now, return all songs since we don't have user authentication
+    start = skip
+    end = skip + limit
+    user_songs = songs_storage[start:end]
+    
+    return user_songs
+
 @router.get("/{song_id}")
 async def get_song(song_id: int):
     """Get a specific song by ID"""
