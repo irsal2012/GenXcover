@@ -1,6 +1,7 @@
 import asyncio
 import random
 from typing import Dict, Any, Optional, List
+from app.services.azure_openai_client import azure_openai_client
 
 class LyricsGenerator:
     """Lyrics generation service for creating song lyrics"""
@@ -124,9 +125,18 @@ class LyricsGenerator:
     
     async def _generate_from_prompt(self, prompt: str, title: str, genre: str) -> str:
         """Generate lyrics from custom prompt"""
-        # For now, create a simple structure incorporating the prompt
-        # In a real implementation, this would use an AI model
+        # Try to use Azure OpenAI first, fallback to template-based generation
+        if azure_openai_client.is_available():
+            try:
+                return await azure_openai_client.generate_lyrics(
+                    title=title,
+                    genre=genre,
+                    custom_prompt=prompt
+                )
+            except Exception as e:
+                print(f"Azure OpenAI generation failed, falling back to templates: {e}")
         
+        # Fallback to template-based generation
         verse1 = f"In the world of {prompt.lower()}\nWhere dreams and reality meet\nI find myself searching for meaning\nIn every rhythm and beat"
         
         chorus = f"This is my song about {prompt.lower()}\nLet the music set me free\n{title} is calling out my name\nThis is who I'm meant to be"
@@ -140,6 +150,19 @@ class LyricsGenerator:
     async def _generate_from_templates(self, title: str, genre: str, theme: str, style: str) -> str:
         """Generate lyrics from templates"""
         
+        # Try to use Azure OpenAI first, fallback to template-based generation
+        if azure_openai_client.is_available():
+            try:
+                return await azure_openai_client.generate_lyrics(
+                    title=title,
+                    genre=genre,
+                    theme=theme,
+                    style=style
+                )
+            except Exception as e:
+                print(f"Azure OpenAI generation failed, falling back to templates: {e}")
+        
+        # Fallback to template-based generation
         # Get templates for genre and theme
         verse_templates = self.verse_templates.get(genre, {}).get(theme, [])
         chorus_templates = self.chorus_templates.get(genre, {}).get(theme, [])

@@ -61,26 +61,35 @@ async def test_backend():
         print(f"❌ Unexpected error: {e}")
         return False
 
-def test_openai_config():
-    """Test OpenAI configuration"""
-    print("\n🤖 Testing OpenAI configuration...")
+def test_azure_openai_config():
+    """Test Azure OpenAI configuration"""
+    print("\n🤖 Testing Azure OpenAI configuration...")
     
     try:
         from app.core.config import settings
+        from app.services.azure_openai_client import azure_openai_client
         
-        if settings.openai_api_key:
-            print("✅ OpenAI API key is configured")
+        if settings.azure_openai_api_key and settings.azure_openai_endpoint:
+            print("✅ Azure OpenAI credentials are configured")
             # Don't print the actual key for security
-            key_preview = settings.openai_api_key[:10] + "..." if len(settings.openai_api_key) > 10 else "***"
+            key_preview = settings.azure_openai_api_key[:10] + "..." if len(settings.azure_openai_api_key) > 10 else "***"
             print(f"   Key preview: {key_preview}")
+            print(f"   Endpoint: {settings.azure_openai_endpoint}")
+            print(f"   Deployment: {settings.azure_openai_deployment}")
+            print(f"   API Version: {settings.azure_openai_api_version}")
+            
+            if azure_openai_client.is_available():
+                print("✅ Azure OpenAI client is initialized and ready")
+            else:
+                print("⚠️  Azure OpenAI client failed to initialize")
         else:
-            print("⚠️  OpenAI API key not configured")
-            print("💡 Set OPENAI_API_KEY in your .env file for lyrics generation")
+            print("⚠️  Azure OpenAI credentials not configured")
+            print("💡 Set AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT in your .env file")
             
         return True
         
     except Exception as e:
-        print(f"❌ Error checking OpenAI config: {e}")
+        print(f"❌ Error checking Azure OpenAI config: {e}")
         return False
 
 def main():
@@ -92,8 +101,8 @@ def main():
     # Run async test
     success = asyncio.run(test_backend())
     
-    # Test OpenAI config
-    test_openai_config()
+    # Test Azure OpenAI config
+    test_azure_openai_config()
     
     print("\n" + "=" * 60)
     if success:

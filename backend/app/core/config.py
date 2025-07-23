@@ -24,9 +24,17 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379"
     
-    # OpenAI
+    # OpenAI (Legacy - keeping for backward compatibility)
     openai_api_key: Optional[str] = None
     openai_embedding_model: str = "text-embedding-ada-002"
+    
+    # Azure OpenAI Configuration
+    azure_openai_api_key: Optional[str] = None
+    azure_openai_endpoint: Optional[str] = None
+    azure_openai_deployment: str = "gpt-4o"
+    azure_openai_api_version: str = "2024-10-21"
+    azure_openai_max_tokens: int = 4000
+    azure_openai_temperature: float = 0.7
     
     # Tavily (for search)
     tavily_api_key: Optional[str] = None
