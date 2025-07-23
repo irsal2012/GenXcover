@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "GenXcover"
     version: str = "1.0.0"
     debug: bool = True
+    log_level: str = "INFO"
     
     # API Configuration
     api_v1_str: str = "/api/v1"
