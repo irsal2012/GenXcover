@@ -1,12 +1,13 @@
-import openai
+from openai import AsyncOpenAI
 from typing import Dict, Any, Optional
 from ...core.config import settings
 
 
 class LyricsGenerator:
     def __init__(self):
+        self.client = None
         if settings.openai_api_key:
-            openai.api_key = settings.openai_api_key
+            self.client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     async def generate_lyrics(
         self,
@@ -18,11 +19,15 @@ class LyricsGenerator:
     ) -> Dict[str, Any]:
         """Generate song lyrics using OpenAI GPT"""
         
+        if not self.client:
+            # Fallback to demo lyrics if no API key
+            return self._generate_demo_lyrics(title, genre, theme, style)
+        
         # Build the prompt
         prompt = self._build_lyrics_prompt(title, genre, theme, style, custom_prompt)
         
         try:
-            response = await openai.ChatCompletion.acreate(
+            response = await self.client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {
@@ -151,3 +156,149 @@ Make the lyrics engaging, memorable, and appropriate for the genre. Include emot
         # Rough estimate: average 2-3 words per second in songs
         estimated_seconds = word_count / 2.5
         return round(estimated_seconds, 1)
+    
+    def _generate_demo_lyrics(
+        self,
+        title: str,
+        genre: str,
+        theme: Optional[str] = None,
+        style: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generate demo lyrics when OpenAI API is not available"""
+        
+        # Create genre-specific demo lyrics
+        demo_lyrics_templates = {
+            "Pop": """Verse 1:
+Walking down the street tonight
+Everything feels so right
+{theme} is calling out my name
+Nothing will ever be the same
+
+Chorus:
+{title}, {title}
+Dancing in the moonlight
+{title}, {title}
+Everything's gonna be alright
+
+Verse 2:
+Stars are shining up above
+This feeling that I'm thinking of
+{theme} is all I need to know
+Together we will steal the show
+
+Chorus:
+{title}, {title}
+Dancing in the moonlight
+{title}, {title}
+Everything's gonna be alright
+
+Bridge:
+When the world gets heavy
+And the road gets long
+We'll remember this moment
+In our favorite song
+
+Chorus:
+{title}, {title}
+Dancing in the moonlight
+{title}, {title}
+Everything's gonna be alright""",
+            
+            "Rock": """Verse 1:
+Thunder rolling in the night
+Ready for the coming fight
+{theme} burning in my soul
+Rock and roll is my control
+
+Chorus:
+{title}! {title}!
+Screaming loud and free
+{title}! {title}!
+This is who I'm meant to be
+
+Verse 2:
+Electric guitars blazing high
+Reaching for the endless sky
+{theme} pumping through my veins
+Breaking free from all the chains
+
+Chorus:
+{title}! {title}!
+Screaming loud and free
+{title}! {title}!
+This is who I'm meant to be
+
+Bridge:
+When the darkness falls around
+We'll make that thunderous sound
+Nothing's gonna stop us now
+We'll show them all just how
+
+Chorus:
+{title}! {title}!
+Screaming loud and free
+{title}! {title}!
+This is who I'm meant to be""",
+            
+            "Blues": """Verse 1:
+Woke up this morning, feeling so low
+{theme} got me down, nowhere to go
+{title} is all I got left to say
+Blues gonna wash my pain away
+
+Chorus:
+Oh {title}, {title}
+Why you gotta be so cruel
+{title}, {title}
+Playing me just like a fool
+
+Verse 2:
+Rain keeps falling on my door
+Can't take this heartache anymore
+{theme} is haunting all my dreams
+Nothing's ever what it seems
+
+Chorus:
+Oh {title}, {title}
+Why you gotta be so cruel
+{title}, {title}
+Playing me just like a fool
+
+Bridge:
+Someday the sun will shine again
+Till then I'll sing about my pain
+These blues will help me find my way
+To see a brighter, better day
+
+Chorus:
+Oh {title}, {title}
+Why you gotta be so cruel
+{title}, {title}
+Playing me just like a fool"""
+        }
+        
+        # Get template for genre or default to Pop
+        template = demo_lyrics_templates.get(genre, demo_lyrics_templates["Pop"])
+        
+        # Replace placeholders
+        lyrics = template.format(
+            title=title,
+            theme=theme or "love"
+        )
+        
+        # Parse the lyrics structure
+        parsed_lyrics = self._parse_lyrics_structure(lyrics)
+        
+        return {
+            "lyrics": lyrics,
+            "structure": parsed_lyrics,
+            "metadata": {
+                "title": title,
+                "genre": genre,
+                "theme": theme,
+                "style": style,
+                "word_count": len(lyrics.split()),
+                "estimated_duration": self._estimate_duration(lyrics),
+                "demo_mode": True
+            }
+        }

@@ -32,18 +32,17 @@ def create_song(
 async def generate_song(
     song_request: SongGenerate,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """Generate a new song with AI"""
-    # Create initial song record
+    # Create initial song record (using dummy user ID for testing)
     db_song = SongModel(
         title=song_request.title,
         genre=song_request.genre,
         style=song_request.style,
         theme=song_request.theme,
         voice_type=song_request.voice_type,
-        creator_id=current_user.id,
+        creator_id=1,  # Dummy user ID for testing
         generation_params=song_request.dict()
     )
     db.add(db_song)
@@ -331,8 +330,7 @@ async def remix_song(
 @router.get("/suggestions/{genre}")
 async def get_generation_suggestions(
     genre: str,
-    theme: Optional[str] = None,
-    current_user: UserModel = Depends(get_current_active_user)
+    theme: Optional[str] = None
 ):
     """Get suggestions for song generation parameters"""
     try:

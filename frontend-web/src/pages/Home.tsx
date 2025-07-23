@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { RootState } from '../store';
 import { songsAPI } from '../services/api';
 import { Song, Genre, VoiceType, Style, GENRES, VOICE_TYPES, STYLES } from '../types';
@@ -29,6 +30,7 @@ interface GenerationSuggestions {
 }
 
 const Home: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.auth);
   const { songs, isLoading } = useSelector((state: RootState) => state.songs);
@@ -118,6 +120,9 @@ const Home: React.FC = () => {
   };
 
   const generateCompleteSong = async () => {
+    console.log('Generate button clicked!');
+    console.log('Form data:', form);
+    
     if (!form.title.trim()) {
       alert('Please enter a song title');
       return;
@@ -128,6 +133,7 @@ const Home: React.FC = () => {
     setGeneratedSong(null);
 
     try {
+      console.log('Starting song generation...');
       setGenerationProgress('Generating lyrics...');
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate progress
 
@@ -136,6 +142,17 @@ const Home: React.FC = () => {
 
       setGenerationProgress('Synthesizing audio...');
       await new Promise(resolve => setTimeout(resolve, 2000));
+
+      console.log('Calling API with data:', {
+        title: form.title,
+        genre: form.genre,
+        style: form.style,
+        theme: form.theme || undefined,
+        voice_type: form.voice_type,
+        custom_prompt: form.custom_prompt || undefined,
+        include_audio: form.include_audio,
+        include_midi: form.include_midi
+      });
 
       const song = await songsAPI.generateSong({
         title: form.title,
@@ -148,12 +165,14 @@ const Home: React.FC = () => {
         include_midi: form.include_midi
       });
 
+      console.log('API response:', song);
       setGeneratedSong(song);
       setGenerationProgress('Song generation complete!');
       loadRecentSongs(); // Refresh recent songs
     } catch (error: any) {
       console.error('Failed to generate song:', error);
-      setGenerationProgress(`Error: ${error.response?.data?.detail || 'Failed to generate song'}`);
+      console.error('Error details:', error.response);
+      setGenerationProgress(`Error: ${error.response?.data?.detail || error.message || 'Failed to generate song'}`);
     } finally {
       setIsGenerating(false);
     }
@@ -224,6 +243,25 @@ const Home: React.FC = () => {
       {/* Hero Section */}
       <div className="hero-section">
         <div className="hero-content">
+          <button 
+            onClick={() => navigate('/')}
+            className="back-button"
+            style={{
+              position: 'absolute',
+              top: '20px',
+              left: '20px',
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '8px 16px',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '14px',
+              backdropFilter: 'blur(10px)'
+            }}
+          >
+            ← Back to Dashboard
+          </button>
           <div className="hero-icon">🎵</div>
           <h1>Music Generation</h1>
           <p>Create AI-powered music with advanced algorithms and machine learning.</p>

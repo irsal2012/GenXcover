@@ -45,7 +45,11 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <h3 style={{ marginTop: 0, color: '#74b9ff' }}>🎵 Music Generation</h3>
           <p>Create AI-powered music with advanced algorithms and machine learning.</p>
-          <button className="btn btn-primary" style={{ marginTop: '15px' }}>
+          <button 
+            className="btn btn-primary" 
+            style={{ marginTop: '15px' }}
+            onClick={() => navigate('/generate-music')}
+          >
             Generate Music
           </button>
         </div>
