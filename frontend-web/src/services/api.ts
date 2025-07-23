@@ -11,7 +11,7 @@ import {
   ApiError
 } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8005/api/v1';
 
 // Create axios instance
 const api = axios.create({
