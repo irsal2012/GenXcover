@@ -1,3 +1,4 @@
+import asyncio
 from openai import AsyncOpenAI
 from typing import Dict, Any, Optional
 from ...core.config import settings
